@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Online Quiz System</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f3f5fb;
+            color: #20243a;
+        }
+
+        header {
+            background: #4f46e5;
+            color: white;
+            padding: 22px 8%;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 26px;
+        }
+
+        header p {
+            margin-bottom: 0;
+            color: #e0e7ff;
+        }
+
+        main {
+            max-width: 850px;
+            margin: 35px auto;
+            padding: 0 18px;
+        }
+
+        .card {
+            background: white;
+            padding: 25px;
+            margin-bottom: 20px;
+            border-radius: 14px;
+            box-shadow: 0 5px 20px #0000000c;
+        }
+
+        h2 {
+            margin-top: 0;
+        }
+
+        .quiz-item {
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 18px;
+            margin-top: 15px;
+        }
+
+        .quiz-item p {
+            color: #666;
+        }
+
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 11px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+        }
+
+        button:hover {
+            background: #3730a3;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .option {
+            display: block;
+            padding: 12px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            margin: 10px 0;
+            cursor: pointer;
+        }
+
+        .option:hover {
+            background: #eef2ff;
+        }
+
+        .option input {
+            margin-right: 10px;
+        }
+
+        #message {
+            margin-top: 15px;
+            font-weight: bold;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .score {
+            font-size: 24px;
+            color: #16a34a;
+            font-weight: bold;
+        }
+
+        footer {
+            text-align: center;
+            color: #777;
+            padding: 25px;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>Online Quiz System</h1>
+    <p>Learn, practice and test your knowledge.</p>
+</header>
+
+<main>
+    <section class="card" id="quizListSection">
+        <h2>Available Quizzes</h2>
+        <p>Select a quiz and test your knowledge.</p>
+
+        <div id="quizList">Loading quizzes...</div>
+        <p id="listMessage"></p>
+    </section>
+
+    <section class="card hidden" id="quizSection">
+        <h2 id="quizTitle">Quiz</h2>
+        <p id="quizDescription"></p>
+
+        <form id="quizForm">
+            <div id="questions"></div>
+            <button type="submit" id="submitButton">
+                Submit Quiz
+            </button>
+        </form>
+
+        <p id="message"></p>
+    </section>
+
+    <section class="card hidden" id="resultSection">
+        <h2>Quiz Result</h2>
+        <p class="score" id="percentage"></p>
+        <p id="resultDetails"></p>
+        <button onclick="loadQuizzes()">Back to Quizzes</button>
+    </section>
+</main>
+
+<footer>
+    Online Quiz System | Student Portal
+</footer>
+
+<script>
+    const API_URL = "/api/quizzes";
+
+    const quizList = document.getElementById("quizList");
+    const listMessage = document.getElementById("listMessage");
+    const quizListSection = document.getElementById("quizListSection");
+    const quizSection = document.getElementById("quizSection");
+    const resultSection = document.getElementById("resultSection");
+
+    let currentQuiz = null;
+
+    async function loadQuizzes() {
+        quizListSection.classList.remove("hidden");
+        quizSection.classList.add("hidden");
+        resultSection.classList.add("hidden");
+
+        quizList.textContent = "Loading quizzes...";
+        listMessage.textContent = "";
+
+        try {
+            const response = await fetch(API_URL);
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error("Could not load quizzes.");
+            }
+
+            quizList.replaceChildren();
+
+            if (data.quizzes.length === 0) {
+                quizList.textContent = "No quizzes available yet.";
+                return;
+            }
+
+            data.quizzes.forEach(quiz => {
+                const item = document.createElement("div");
+                item.className = "quiz-item";
+
+                const title = document.createElement("h3");
+                title.textContent = quiz.title;
+
+                const description = document.createElement("p");
+                description.textContent =
+                    quiz.description || "Test your knowledge.";
+
+                const count = document.createElement("p");
+                count.textContent =
+                    (quiz.questions || []).length + " questions";
+
+                const button = document.createElement("button");
+                button.textContent = "Start Quiz";
+                button.addEventListener("click", () => startQuiz(quiz._id));
+
+                item.append(title, description, count, button);
+                quizList.appendChild(item);
+            });
+
+        } catch (error) {
+            quizList.textContent =
+                "Could not connect to the server. Please try again.";
+            listMessage.textContent = error.message;
+        }
+    }
+
+    async function startQuiz(id) {
+        try {
+            const response = await fetch(`${API_URL}/${id}`);
+            const data = await response.json();
+
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || "Could not open quiz.");
+            }
+
+            currentQuiz = data.quiz;
+
+            document.getElementById("quizTitle").textContent =
+                currentQuiz.title;
+
+            document.getElementById("quizDescription").textContent =
+                currentQuiz.description || "";
+
+            const questionsContainer =
+                document.getElementById("questions");
+
+            questionsContainer.replaceChildren();
+
+            currentQuiz.questions.forEach((question, index) => {
+                const card = document.createElement("div");
+                card.className = "quiz-item";
+
+                const heading = document.createElement("h3");
+                heading.textContent =
+                    `${index + 1}. ${question.questionText}`;
+
+                card.appendChild(heading);
+
+                question.options.forEach(option => {
+                    const label = document.createElement("label");
+                    label.className = "option";
+
+                    const radio = document.createElement("input");
+                    radio.type = "radio";
+                    radio.name = `question-${index}`;
+                    radio.value = option;
+                    radio.required = true;
+
+                    label.append(radio, document.createTextNode(option));
+                    card.appendChild(label);
+                });
+
+                questionsContainer.appendChild(card);
+            });
+
+            document.getElementById("message").textContent = "";
+            document.getElementById("submitButton").disabled = false;
+
+            quizListSection.classList.add("hidden");
+            resultSection.classList.add("hidden");
+            quizSection.classList.remove("hidden");
+
+        } catch (error) {
+            alert(error.message);
+        }
+    }
+
+    document.getElementById("quizForm").addEventListener(
+        "submit",
+        async function(event) {
+            event.preventDefault();
+
+            if (!currentQuiz) return;
+
+            const answers = currentQuiz.questions.map((question, index) => {
+                const selected = document.querySelector(
+                    `input[name="question-${index}"]:checked`
+                );
+
+                return selected ? selected.value : null;
+            });
+
+            if (answers.some(answer => answer === null)) {
+                document.getElementById("message").textContent =
+                    "Please answer every question.";
+                return;
+            }
+
+            const submitButton = document.getElementById("submitButton");
+            const message = document.getElementById("message");
+
+            submitButton.disabled = true;
+            message.textContent = "Submitting your answers...";
+
+            try {
+                const response = await fetch(
+                    `${API_URL}/${currentQuiz._id}/submit`,
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({ answers })
+                    }
+                );
+
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    throw new Error(
+                        result.message || "Quiz submission failed."
+                    );
+                }
+
+                quizSection.classList.add("hidden");
+                resultSection.classList.remove("hidden");
+
+                document.getElementById("percentage").textContent =
+                    result.percentage + "%";
+
+                document.getElementById("resultDetails").textContent =
+                    `Total Questions: ${result.totalQuestions} | ` +
+                    `Correct: ${result.correctAnswers} | ` +
+                    `Wrong: ${result.wrongAnswers}`;
+
+            } catch (error) {
+                message.textContent = error.message;
+                submitButton.disabled = false;
+            }
+        }
+    );
+
+    loadQuizzes();
+</script>
+
+</body>
+</html>
+```
